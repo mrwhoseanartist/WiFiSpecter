@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Wi-Fi Deauthentication Tool
+# WiFiSpecter
 # echo "This tool is created by mrwhoseanartist"
 
 function require_root() {
@@ -23,7 +23,7 @@ monitor_interface="${wifi_interface}${mon}"
 
 display_menu() {
     echo "-----------------------------------------------"
-    echo "### Wi-Fi Deauthentication Tool ###"
+    echo "################ WiFiSpecter ################"
     echo "1. Check Wi-Fi Adapter Status"
     echo "2. Change Wi-Fi Adapter to MONITOR MODE"
     echo "3. Change Wi-Fi Adapter to MANAGED MODE"
